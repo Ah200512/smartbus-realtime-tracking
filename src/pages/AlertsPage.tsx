@@ -127,7 +127,7 @@ function ExpandedAlertCard({ alert, onResolve, onDismiss }: ExpandedAlertCardPro
                             {timeAgo(new Date(alert.createdAt))}
                         </span>
                         {alert.bus && (
-                            <Badge variant={isActive ? 'destructive' : 'secondary'} className="text-xs py-0">
+                            <Badge variant={isActive ? 'destructive' : 'outline'} className="text-xs py-0">
                                 <Bus className="h-3 w-3 mr-1" />
                                 {alert.bus.number}
                             </Badge>

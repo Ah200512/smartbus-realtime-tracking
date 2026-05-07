@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api, getToken, setToken, removeToken } from '../lib/api';
+import { useAppStore } from '../stores/appStore';
+
 
 interface User {
   id: string;
