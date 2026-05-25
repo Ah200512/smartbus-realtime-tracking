@@ -4,14 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"tsx server.ts\" \"tsx ws-server.ts\"",
+    "dev": "tsx server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "tsx server.ts",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "seed": "node prisma/seed.mjs",
-    "dev:api": "tsx server.ts",
-    "dev:ws": "tsx ws-server.ts"
+    "dev:api": "tsx server.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -17,6 +18,7 @@ import busRoutes from './routes/busRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import paymentRoutes from './routes/payment.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import { setupSocket, registerSimulationRoutes } from './socket.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,6 +54,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 
+// Register Chennai Bus Simulation REST API routes
+registerSimulationRoutes(app);
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -65,11 +70,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
+const httpServer = createServer(app);
+
 async function bootstrap() {
   await connectDB();
 
-  app.listen(PORT, () => {
-    console.log(`🚀 SmartBus API Server running on http://localhost:${PORT}`);
+  // Set up WebSocket server hooked into HTTP server
+  setupSocket(httpServer, allowedOrigins);
+
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 SmartBus Unified API & WebSocket Server running on http://localhost:${PORT}`);
   });
 }
 
