@@ -1,65 +1,71 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-function generateRoute(startLat, startLng, steps = 30) {
-  const points = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
-    const lat = startLat + Math.sin(t * Math.PI) * 0.03;
-    const lng = startLng + Math.cos(t * Math.PI * 0.6) * 0.03;
-    points.push([lat, lng]);
-  }
-  return points;
-}
-
 async function main() {
-  for (let i = 1; i <= 30; i += 1) {
-    const busNumber = `BUS-${String(i).padStart(3, '0')}`;
-    const routeName = `Chennai Route ${String(i).padStart(2, '0')}`;
-    const startLat = 13.0827 + (Math.random() - 0.5) * 0.18;
-    const startLng = 80.2707 + (Math.random() - 0.5) * 0.18;
-    const route = generateRoute(startLat, startLng, 30);
+  const buses = [
+    { busNumber: 'BUS-001', routeName: 'Chennai Central to SRM', startLocation: 'Chennai Central', endLocation: 'SRM University', capacity: 40, driverName: 'Ramesh', status: 'Active' },
+    { busNumber: 'BUS-002', routeName: 'Tambaram to OMR', startLocation: 'Tambaram', endLocation: 'OMR', capacity: 42, driverName: 'Arun', status: 'Active' },
+    { busNumber: 'BUS-003', routeName: 'Mylapore Circular', startLocation: 'Mylapore', endLocation: 'Mylapore', capacity: 36, driverName: 'Kumar', status: 'Maintenance' },
+  ];
 
-    const bus = await prisma.bus.upsert({
-      where: { number: busNumber },
+  for (const busData of buses) {
+    await prisma.bus.upsert({
+      where: { busNumber: busData.busNumber },
+      update: busData,
+      create: {
+        ...busData,
+        currentLocation: { lat: 13.0827, lng: 80.2707 },
+      },
+    });
+  }
+
+  const users = [
+    { username: 'pranav', email: 'pranav@example.com', password: 'password123', role: 'STUDENT' },
+    { username: 'driver1', email: 'driver1@example.com', password: 'password123', role: 'DRIVER' },
+    { username: 'admin', email: 'admin@example.com', password: 'password123', role: 'ADMIN' },
+  ];
+
+  for (const userData of users) {
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    const user = await prisma.user.upsert({
+      where: { email: userData.email },
       update: {
-        routeName,
-        capacity: 40 + (i % 8),
+        username: userData.username,
+        role: userData.role,
       },
       create: {
-        number: busNumber,
-        routeName,
-        capacity: 40 + (i % 8),
-        status: 'INACTIVE',
-        currentOccupancy: 0,
+        username: userData.username,
+        email: userData.email,
+        password: hashedPassword,
+        role: userData.role,
       },
     });
 
-    await prisma.routeStop.deleteMany({ where: { busId: bus.id } });
-
-    await prisma.routeStop.createMany({
-      data: route.map((point, index) => ({
-        busId: bus.id,
-        name: `${routeName} Stop ${index + 1}`,
-        latitude: point[0],
-        longitude: point[1],
-        orderIndex: index,
-      })),
-    });
-
-    await prisma.busLocation.create({
-      data: {
-        busId: bus.id,
-        latitude: route[0][0],
-        longitude: route[0][1],
-        speed: 0,
-        heading: 0,
-      },
-    });
+    if (userData.role === 'STUDENT') {
+      await prisma.profile.upsert({
+        where: { userId: user.id },
+        update: {
+          fullName: 'Pranav',
+          registerNumber: 'RA2311003020288',
+          department: 'CSE',
+          year: 2,
+          phone: '+919999999999',
+        },
+        create: {
+          userId: user.id,
+          fullName: 'Pranav',
+          registerNumber: 'RA2311003020288',
+          department: 'CSE',
+          year: 2,
+          phone: '+919999999999',
+        },
+      });
+    }
   }
 
-  console.log('Seeded 30 Chennai buses with route stops.');
+  console.log('Seeded Supabase/Postgres with buses, demo users, and a student profile.');
 }
 
 main()

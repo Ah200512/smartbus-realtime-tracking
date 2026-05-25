@@ -1,17 +1,16 @@
-import mongoose from 'mongoose';
+import { prisma } from '../lib/prisma.js';
 
 export async function connectDB() {
-  const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smartbus';
   try {
-    console.log(`📡 Attempting to connect to MongoDB: ${MONGODB_URI}`);
-    const conn = await mongoose.connect(MONGODB_URI);
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    return conn;
+    console.log('📡 Attempting to connect to Supabase Postgres via Prisma');
+    await prisma.$connect();
+    console.log('✅ Supabase Postgres connected');
+    return prisma;
   } catch (error) {
     if (error instanceof Error) {
-      console.error(`❌ MongoDB Connection Failed: ${error.message}`);
+      console.error(`❌ Supabase connection failed: ${error.message}`);
     } else {
-      console.error('❌ Unknown error connecting to MongoDB');
+      console.error('❌ Unknown error connecting to Supabase');
     }
     process.exit(1);
   }

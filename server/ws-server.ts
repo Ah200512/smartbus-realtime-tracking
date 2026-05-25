@@ -418,6 +418,17 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Browser-friendly root response so localhost:3001 does not show a 404 page
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'websocket-server',
+    message: 'Socket.IO server is running',
+    frontend: 'http://localhost:5173',
+    health: '/health',
+  });
+});
+
 const PORT = process.env.WS_PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`WebSocket server running on port ${PORT}`);

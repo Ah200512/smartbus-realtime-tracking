@@ -3,163 +3,112 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum UserRole {
-  STUDENT
-  DRIVER
-  ADMIN
-}
-
-enum BusStatus {
-  ACTIVE
-  INACTIVE
-  MAINTENANCE
-}
-
-enum TripStatus {
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum AlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id              String    @id @default(cuid())
-  clerkId         String    @unique
-  email           String    @unique
-  name            String
-  role            UserRole?
+  id              String        @id @default(cuid())
+  username        String
+  email           String        @unique
+  password        String
+  role            String        @default("STUDENT")
   phone           String?
-  avatarUrl       String?
-  onboardingDone  Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  countryCode     String?
+  plan            String        @default("none")
+  subscriptionStart DateTime?
+  subscriptionEnd DateTime?
+  trialUsed       Boolean       @default(false)
+  onboardingDone  Boolean       @default(false)
+  paymentMethods  Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  driver          Driver?
+  profiles        Profile[]
   attendances     Attendance[]
-  sosAlerts       SOSAlert[]
+  reviews         Review[]
+  orders          Order[]
 
-  @@index([clerkId])
   @@index([role])
 }
 
 model Bus {
+  id              String        @id @default(cuid())
+  busNumber       String        @unique
+  routeName       String?
+  startLocation   String?
+  endLocation     String?
+  stops           Json?
+  currentLocation Json?
+  status          String        @default("Active")
+  driverName      String?
+  capacity        Int?
+  createdAt       DateTime      @default(now())
+
+  attendances     Attendance[]
+}
+
+model Profile {
   id              String    @id @default(cuid())
-  number          String    @unique
-  routeName       String
-  capacity        Int
-  status          BusStatus @default(INACTIVE)
-  currentOccupancy Int      @default(0)
+  userId          String    @unique
+  fullName        String?
+  registerNumber  String    @unique
+  phone           String?
+  department      String?
+  year            Int?
+  gender          String?
+  address         String?
+  profilePicture  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  driver          Driver?
-  locations       BusLocation[]
-  trips           Trip[]
-  attendances     Attendance[]
-  sosAlerts       SOSAlert[]
-  routeStops      RouteStop[]
-
-  @@index([status])
-}
-
-model Driver {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  busId           String?   @unique
-  licenseNumber   String?
-  isAvailable     Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bus             Bus?      @relation(fields: [busId], references: [id])
-  trips           Trip[]
-
-  @@index([userId])
-}
-
-model BusLocation {
-  id              String    @id @default(cuid())
-  busId           String
-  latitude        Float
-  longitude       Float
-  speed           Float     @default(0)
-  heading         Float     @default(0)
-  timestamp       DateTime  @default(now())
-
-  bus             Bus       @relation(fields: [busId], references: [id], onDelete: Cascade)
-
-  @@index([busId, timestamp(sort: Desc)])
-}
-
-model Trip {
-  id              String     @id @default(cuid())
-  busId           String
-  driverId        String
-  status          TripStatus @default(IN_PROGRESS)
-  startedAt       DateTime   @default(now())
-  endedAt         DateTime?
-  studentCount    Int        @default(0)
-
-  bus             Bus        @relation(fields: [busId], references: [id])
-  driver          Driver     @relation(fields: [driverId], references: [id])
-
-  @@index([busId, status])
-  @@index([driverId])
-}
-
-model RouteStop {
-  id              String    @id @default(cuid())
-  busId           String
-  name            String
-  latitude        Float
-  longitude       Float
-  orderIndex      Int
-  estimatedTime   String?
-
-  bus             Bus       @relation(fields: [busId], references: [id], onDelete: Cascade)
-
-  @@index([busId, orderIndex])
 }
 
 model Attendance {
   id              String    @id @default(cuid())
   userId          String
   busId           String
-  scannedAt       DateTime  @default(now())
+  timestamp       DateTime  @default(now())
+  status          String    @default("Present")
 
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   bus             Bus       @relation(fields: [busId], references: [id])
 
-  @@index([userId, scannedAt(sort: Desc)])
-  @@index([busId, scannedAt(sort: Desc)])
+  @@index([userId, timestamp(sort: Desc)])
+  @@index([busId, timestamp(sort: Desc)])
 }
 
-model SOSAlert {
-  id              String        @id @default(cuid())
+model Review {
+  id              String    @id @default(cuid())
   userId          String
-  busId           String
-  message         String
-  severity        AlertSeverity @default(HIGH)
-  latitude        Float?
-  longitude       Float?
-  resolved        Boolean       @default(false)
-  resolvedAt      DateTime?
-  resolvedBy      String?
-  createdAt       DateTime      @default(now())
+  userName        String
+  userEmail       String
+  rating          Int
+  title           String
+  comment         String
+  role            String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user            User          @relation(fields: [userId], references: [id])
-  bus             Bus           @relation(fields: [busId], references: [id])
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([resolved, createdAt(sort: Desc)])
-  @@index([busId])
+  @@index([role, createdAt(sort: Desc)])
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  userId          String
+  plan            String
+  price           Float
+  paymentMethod   String    @default("card")
+  status          String    @default("pending")
+  qrCode          String    @default("")
+  invoiceNumber   String    @unique
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
 }

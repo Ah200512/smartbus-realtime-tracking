@@ -1,14 +1,10 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import Order from '../models/Order.js';
-import User from '../models/User.js';
+import { prisma } from '../lib/prisma.js';
+import { withLegacyId, withLegacyIds } from '../lib/formatters.js';
 import QRCode from 'qrcode';
 
 const router = Router();
-let localOrders: any[] = [];
-let useLocal = false;
-
-export function setPaymentLocalStorage(val: boolean) { useLocal = val; }
 
 // POST /api/payment/cart - Create order
 router.post('/cart', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -20,23 +16,17 @@ router.post('/cart', authMiddleware, async (req: AuthRequest, res: Response) => 
 
     const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    if (useLocal) {
-      const order = {
-        _id: Date.now().toString(),
+    const order = await prisma.order.create({
+      data: {
         userId: req.userId,
-        plan, price, paymentMethod, status: 'pending',
-        qrCode: '', invoiceNumber,
-        createdAt: new Date(),
-      };
-      localOrders.push(order);
-      return res.status(201).json(order);
-    }
-
-    const order = await Order.create({
-      userId: req.userId, plan, price, paymentMethod,
-      invoiceNumber, status: 'pending',
+        plan,
+        price: Number(price),
+        paymentMethod,
+        invoiceNumber,
+        status: 'pending',
+      },
     });
-    res.status(201).json(order);
+    res.status(201).json(withLegacyId(order));
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -47,6 +37,9 @@ router.post('/checkout/:orderId', authMiddleware, async (req: AuthRequest, res: 
   try {
     const { orderId } = req.params;
     const { paymentMethod, lastFour } = req.body;
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
     // Generate QR code
     const qrData = JSON.stringify({
@@ -62,57 +55,50 @@ router.post('/checkout/:orderId', authMiddleware, async (req: AuthRequest, res: 
       color: { dark: '#f97316', light: '#1a1a2e' },
     });
 
-    if (useLocal) {
-      const idx = localOrders.findIndex(o => o._id === orderId);
-      if (idx === -1) return res.status(404).json({ message: 'Order not found' });
-      
-      const order = localOrders[idx];
-      order.status = 'completed';
-      order.qrCode = qrCodeDataUrl;
-      
-      // Update user subscription (local)
-      const isFreeTrial = order.plan === 'basic' && order.price === 0;
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14); // 14-day trial
-      
-      return res.json(order);
-    }
-
-    const order = await Order.findByIdAndUpdate(orderId, {
-      status: 'completed',
-      qrCode: qrCodeDataUrl,
-    }, { new: true });
-
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'completed',
+        qrCode: qrCodeDataUrl,
+      },
+    });
 
     // Update user subscription
     const isFreeTrial = order.plan === 'basic' && order.price === 0;
     const subscriptionEnd = new Date();
-    
+
     if (isFreeTrial) {
       subscriptionEnd.setDate(subscriptionEnd.getDate() + 14); // 14-day trial
     } else {
       subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1); // 1-month subscription
     }
 
-    await User.findByIdAndUpdate(req.userId, {
-      plan: order.plan,
-      subscriptionStart: new Date(),
-      subscriptionEnd,
-      trialUsed: isFreeTrial ? true : false,
-      $push: {
-        paymentMethods: {
-          id: `${paymentMethod}-${Date.now()}`,
-          type: paymentMethod,
-          last4: lastFour || '',
-          brand: paymentMethod === 'card' ? 'Card' : paymentMethod === 'upi' ? 'UPI' : 'Bank',
-          isDefault: true,
-          createdAt: new Date(),
-        }
-      }
-    });
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (user) {
+      const paymentMethods = Array.isArray(user.paymentMethods) ? user.paymentMethods : [];
+      await prisma.user.update({
+        where: { id: req.userId },
+        data: {
+          plan: updatedOrder.plan,
+          subscriptionStart: new Date(),
+          subscriptionEnd,
+          trialUsed: isFreeTrial,
+          paymentMethods: [
+            ...paymentMethods,
+            {
+              id: `${paymentMethod}-${Date.now()}`,
+              type: paymentMethod,
+              last4: lastFour || '',
+              brand: paymentMethod === 'card' ? 'Card' : paymentMethod === 'upi' ? 'UPI' : 'Bank',
+              isDefault: true,
+              createdAt: new Date(),
+            },
+          ],
+        },
+      });
+    }
 
-    res.json(order);
+    res.json(withLegacyId(updatedOrder));
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -144,12 +130,11 @@ router.post('/generate-qr', authMiddleware, async (req: AuthRequest, res: Respon
 // GET /api/payment/orders - Get user orders
 router.get('/orders', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    if (useLocal) {
-      const orders = localOrders.filter(o => o.userId === req.userId);
-      return res.json(orders);
-    }
-    const orders = await Order.find({ userId: req.userId }).sort({ createdAt: -1 });
-    res.json(orders);
+    const orders = await prisma.order.findMany({
+      where: { userId: req.userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(withLegacyIds(orders));
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

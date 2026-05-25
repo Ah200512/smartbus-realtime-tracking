@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import Review from '../models/Review.js';
-import User from '../models/User.js';
+import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { withLegacyId, withLegacyIds } from '../lib/formatters.js';
 
 const router = Router();
 
@@ -9,14 +9,13 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const role = req.query.role as string;
-    const query = role ? { role } : {};
-    
-    const reviews = await Review.find(query)
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .exec();
+    const reviews = await prisma.review.findMany({
+      where: role ? { role } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
 
-    res.json(reviews);
+    res.json(withLegacyIds(reviews));
   } catch (error) {
     console.error('Error fetching reviews:', error);
     res.status(500).json({ message: 'Failed to fetch reviews' });
@@ -27,8 +26,11 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/user/my-reviews', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId;
-    const reviews = await Review.find({ userId }).sort({ createdAt: -1 }).exec();
-    res.json(reviews);
+    const reviews = await prisma.review.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(withLegacyIds(reviews));
   } catch (error) {
     console.error('Error fetching user reviews:', error);
     res.status(500).json({ message: 'Failed to fetch user reviews' });
@@ -53,24 +55,24 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    const user = await User.findById(userId).exec();
-
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const review = new Review({
-      userId,
-      userName: user.username || user.email || 'Anonymous',
-      userEmail: user.email,
-      rating,
-      title,
-      comment,
-      role,
+    const review = await prisma.review.create({
+      data: {
+        userId,
+        userName: user.username || user.email || 'Anonymous',
+        userEmail: user.email,
+        rating: Number(rating),
+        title,
+        comment,
+        role,
+      },
     });
 
-    const savedReview = await review.save();
-    res.status(201).json(savedReview);
+    res.status(201).json(withLegacyId(review));
   } catch (error) {
     console.error('Error creating review:', error);
     res.status(500).json({ message: 'Failed to create review' });
@@ -84,12 +86,12 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     const { rating, title, comment } = req.body;
     const userId = req.userId;
 
-    const review = await Review.findById(id).exec();
+    const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
       return res.status(404).json({ message: 'Review not found' });
     }
 
-    if (review.userId.toString() !== userId) {
+    if (review.userId !== userId) {
       return res.status(403).json({ message: 'Not authorized to update this review' });
     }
 
@@ -97,13 +99,15 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Rating must be between 1 and 5' });
     }
 
-    if (rating) review.rating = rating;
-    if (title) review.title = title;
-    if (comment) review.comment = comment;
-    review.updatedAt = new Date();
-
-    const updatedReview = await review.save();
-    res.json(updatedReview);
+    const updatedReview = await prisma.review.update({
+      where: { id },
+      data: {
+        rating: rating ? Number(rating) : review.rating,
+        title: title || review.title,
+        comment: comment || review.comment,
+      },
+    });
+    res.json(withLegacyId(updatedReview));
   } catch (error) {
     console.error('Error updating review:', error);
     res.status(500).json({ message: 'Failed to update review' });
@@ -116,16 +120,16 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     const { id } = req.params;
     const userId = req.userId;
 
-    const review = await Review.findById(id).exec();
+    const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
       return res.status(404).json({ message: 'Review not found' });
     }
 
-    if (review.userId.toString() !== userId) {
+    if (review.userId !== userId) {
       return res.status(403).json({ message: 'Not authorized to delete this review' });
     }
 
-    await Review.deleteOne({ _id: id });
+    await prisma.review.delete({ where: { id } });
     res.json({ message: 'Review deleted successfully' });
   } catch (error) {
     console.error('Error deleting review:', error);

@@ -1,4 +1,9 @@
-const API_BASE = 'http://localhost:5000/api';
+const rawApiBase = import.meta.env.VITE_API_URL?.trim();
+const API_BASE = rawApiBase
+  ? rawApiBase.replace(/\/$/, '').endsWith('/api')
+    ? rawApiBase.replace(/\/$/, '')
+    : `${rawApiBase.replace(/\/$/, '')}/api`
+  : 'http://localhost:5000/api';
 
 function getToken(): string | null {
   return localStorage.getItem('smartbus_token');

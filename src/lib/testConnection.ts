@@ -8,7 +8,7 @@ export async function testBackendConnection() {
     backend: false,
     health: false,
     cors: false,
-    mongodb: false,
+    database: false,
   };
 
   // Test 1: Backend Root
@@ -55,8 +55,8 @@ export async function testBackendConnection() {
     tests.cors = true; // Don't fail on this since CORS works with simple requests
   }
 
-  // Test 4: MongoDB via Login Endpoint
-  console.log('\n%c4️⃣  Testing MongoDB Connection (via Login)...', 'color: orange');
+  // Test 4: Database via Login Endpoint
+  console.log('\n%c4️⃣  Testing Supabase/Postgres Connection (via Login)...', 'color: orange');
   try {
     const res = await fetch('http://localhost:5000/api/auth/login', {
       method: 'POST',
@@ -65,18 +65,18 @@ export async function testBackendConnection() {
       credentials: 'include',
     });
     const data = await res.json();
-    console.log('%c✅ MongoDB Connection OK', 'color: green', {
+    console.log('%c✅ Database Connection OK', 'color: green', {
       status: res.status,
       response: data
     });
-    tests.mongodb = true;
+    tests.database = true;
   } catch (error: any) {
     if (error.message.includes('Failed to fetch')) {
       console.error('%c❌ Network Error - Backend Not Responding', 'color: red');
       console.error('  Make sure: npm run dev:api');
     } else if (error.message.includes('connect')) {
-      console.error('%c❌ MongoDB Not Connected', 'color: red', error.message);
-      console.error('  Make sure: mongod is running');
+      console.error('%c❌ Database Not Connected', 'color: red', error.message);
+      console.error('  Make sure: DATABASE_URL is set and Supabase is reachable');
     } else {
       console.error('%c⚠️  Database Test Error', 'color: yellow', error.message);
     }
@@ -88,7 +88,7 @@ export async function testBackendConnection() {
     'Backend Root': tests.backend ? '✅ OK' : '❌ FAILED',
     'Health Check': tests.health ? '✅ OK' : '❌ FAILED',
     'CORS': tests.cors ? '✅ OK' : '❌ FAILED',
-    'MongoDB': tests.mongodb ? '✅ OK' : '❌ FAILED',
+    'Database': tests.database ? '✅ OK' : '❌ FAILED',
   });
 
   const passCount = Object.values(tests).filter(t => t).length;
