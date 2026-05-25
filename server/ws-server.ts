@@ -2,7 +2,14 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { chennaiBusSeeds } from './chennaiRoutes';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
 const httpServer = createServer(app);

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { withLegacyId, withLegacyIds } from '../lib/formatters.js';
+import { getSingleParam } from '../lib/params.js';
 
 export const createBus = async (req: Request, res: Response) => {
   try {
@@ -22,7 +23,11 @@ export const getAllBuses = async (req: Request, res: Response) => {
 
 export const getBusById = async (req: Request, res: Response) => {
   try {
-    const bus = await prisma.bus.findUnique({ where: { id: req.params.id } });
+    const busId = getSingleParam(req.params.id);
+    if (!busId) {
+      return res.status(400).json({ message: 'Bus id is required' });
+    }
+    const bus = await prisma.bus.findUnique({ where: { id: busId } });
     if (!bus) {
       return res.status(404).json({ message: 'Bus not found' });
     }
@@ -34,8 +39,12 @@ export const getBusById = async (req: Request, res: Response) => {
 
 export const updateBus = async (req: Request, res: Response) => {
   try {
+    const busId = getSingleParam(req.params.id);
+    if (!busId) {
+      return res.status(400).json({ message: 'Bus id is required' });
+    }
     const bus = await prisma.bus.update({
-      where: { id: req.params.id },
+      where: { id: busId },
       data: req.body,
     });
     if (!bus) {
@@ -49,7 +58,11 @@ export const updateBus = async (req: Request, res: Response) => {
 
 export const deleteBus = async (req: Request, res: Response) => {
   try {
-    const bus = await prisma.bus.delete({ where: { id: req.params.id } });
+    const busId = getSingleParam(req.params.id);
+    if (!busId) {
+      return res.status(400).json({ message: 'Bus id is required' });
+    }
+    const bus = await prisma.bus.delete({ where: { id: busId } });
     if (!bus) {
       return res.status(404).json({ message: 'Bus not found' });
     }

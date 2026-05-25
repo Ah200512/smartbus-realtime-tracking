@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { withLegacyId, withLegacyIds } from '../lib/formatters.js';
+import { getSingleParam } from '../lib/params.js';
 
 const router = Router();
 
@@ -26,6 +27,9 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/user/my-reviews', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
     const reviews = await prisma.review.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -42,6 +46,10 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { rating, title, comment, role } = req.body;
     const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     if (!rating || !title || !comment || !role) {
       return res.status(400).json({ message: 'Rating, title, comment, and role are required' });
@@ -82,9 +90,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 // PUT /api/reviews/:id - Update a review (authenticated, owner only)
 router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getSingleParam(req.params.id);
     const { rating, title, comment } = req.body;
     const userId = req.userId;
+
+    if (!id) {
+      return res.status(400).json({ message: 'Review id is required' });
+    }
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
@@ -117,8 +132,15 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 // DELETE /api/reviews/:id - Delete a review (authenticated, owner only)
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getSingleParam(req.params.id);
     const userId = req.userId;
+
+    if (!id) {
+      return res.status(400).json({ message: 'Review id is required' });
+    }
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {

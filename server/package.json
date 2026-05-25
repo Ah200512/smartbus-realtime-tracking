@@ -1,0 +1,37 @@
+{
+  "name": "bus-tracking-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"tsx server.ts\" \"tsx ws-server.ts\"",
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx server.ts",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "seed": "node prisma/seed.mjs",
+    "dev:api": "tsx server.ts",
+    "dev:ws": "tsx ws-server.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "socket.io": "^4.8.1",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/qrcode": "^1.5.5",
+    "@types/node": "^24.10.1",
+    "concurrently": "^9.2.1",
+    "prisma": "^6.19.3",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3"
+  }
+}

@@ -3,6 +3,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { withLegacyId, withLegacyIds } from '../lib/formatters.js';
 import QRCode from 'qrcode';
+import { getSingleParam } from '../lib/params.js';
 
 const router = Router();
 
@@ -10,6 +11,11 @@ const router = Router();
 router.post('/cart', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { plan, price, paymentMethod } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
     if (!plan || price === undefined) {
       return res.status(400).json({ message: 'Plan and price are required' });
     }
@@ -18,7 +24,7 @@ router.post('/cart', authMiddleware, async (req: AuthRequest, res: Response) => 
 
     const order = await prisma.order.create({
       data: {
-        userId: req.userId,
+        userId,
         plan,
         price: Number(price),
         paymentMethod,
@@ -35,15 +41,23 @@ router.post('/cart', authMiddleware, async (req: AuthRequest, res: Response) => 
 // POST /api/payment/checkout/:orderId - Complete checkout & generate QR
 router.post('/checkout/:orderId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { orderId } = req.params;
+    const orderId = getSingleParam(req.params.orderId);
     const { paymentMethod, lastFour } = req.body;
+    const userId = req.userId;
+
+    if (!orderId) {
+      return res.status(400).json({ message: 'Order id is required' });
+    }
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     // Generate QR code
     const qrData = JSON.stringify({
-      userId: req.userId,
+      userId,
       orderId,
       timestamp: new Date().toISOString(),
       type: 'smartbus_subscription',
@@ -73,11 +87,11 @@ router.post('/checkout/:orderId', authMiddleware, async (req: AuthRequest, res: 
       subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1); // 1-month subscription
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (user) {
       const paymentMethods = Array.isArray(user.paymentMethods) ? user.paymentMethods : [];
       await prisma.user.update({
-        where: { id: req.userId },
+        where: { id: userId },
         data: {
           plan: updatedOrder.plan,
           subscriptionStart: new Date(),
@@ -108,8 +122,13 @@ router.post('/checkout/:orderId', authMiddleware, async (req: AuthRequest, res: 
 router.post('/generate-qr', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { data } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
     const qrData = JSON.stringify({
-      userId: req.userId,
+      userId,
       data: data || {},
       timestamp: new Date().toISOString(),
       type: 'smartbus_pass',
@@ -130,8 +149,12 @@ router.post('/generate-qr', authMiddleware, async (req: AuthRequest, res: Respon
 // GET /api/payment/orders - Get user orders
 router.get('/orders', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
     const orders = await prisma.order.findMany({
-      where: { userId: req.userId },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     });
     res.json(withLegacyIds(orders));

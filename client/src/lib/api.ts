@@ -1,4 +1,4 @@
-const rawApiBase = import.meta.env.VITE_API_URL?.trim();
+const rawApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
 const API_BASE = rawApiBase
   ? rawApiBase.replace(/\/$/, '').endsWith('/api')
     ? rawApiBase.replace(/\/$/, '')
@@ -68,7 +68,7 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
   } catch (error: any) {
     if (error instanceof TypeError) {
       console.error(`🚫 Network Error (Failed to fetch): ${error.message}`);
-      console.error(`⚠️  Make sure backend is running on http://localhost:5000`);
+      console.error(`⚠️  Make sure backend is running on ${API_BASE}`);
       throw new Error(`Network error: Backend may not be running. Check console.`);
     }
     throw error;
